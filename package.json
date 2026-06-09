@@ -5,11 +5,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "papaparse": "latest"
-  },
-  "devDependencies": {}
+    "@supabase/supabase-js": "^2.45.4",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "papaparse": "^5.4.1"
+  }
 }
