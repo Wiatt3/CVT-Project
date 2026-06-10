@@ -1,4 +1,280 @@
 'use client';
-import { useState } from 'react';import Papa from 'papaparse';
-const empty={question:'',reponse_a:'',reponse_b:'',reponse_c:'',reponse_d:'',bonne_reponse:'A',explication:'',difficulte:1,actif:true};
-export default function Admin(){const[password,setPassword]=useState('');const[connected,setConnected]=useState(false);const[questions,setQuestions]=useState([]);const[form,setForm]=useState(empty);const[message,setMessage]=useState('');async function api(method,body){const res=await fetch('/api/admin/questions',{method,headers:{'Content-Type':'application/json','x-admin-password':password},body:body?JSON.stringify(body):undefined});const json=await res.json();if(!res.ok)throw new Error(json.error||'Erreur');return json;}async function login(){try{const json=await api('GET');setQuestions(json.questions||[]);setConnected(true);setMessage('');}catch(e){setMessage('Mot de passe incorrect ou configuration incomplète.');}}async function refresh(){const json=await api('GET');setQuestions(json.questions||[]);}async function saveQuestion(){try{if(form.id){await api('PUT',form);setMessage('Question modifiée.');}else{await api('POST',form);setMessage('Question ajoutée.');}setForm(empty);await refresh();}catch(e){setMessage(e.message);}}async function deleteQuestion(id){if(!confirm('Supprimer cette question ?'))return;try{await api('DELETE',{id});setMessage('Question supprimée.');await refresh();}catch(e){setMessage(e.message);}}function handleCsv(file){Papa.parse(file,{header:true,skipEmptyLines:true,complete:async(results)=>{try{const rows=results.data.map(r=>({question:r.question,reponse_a:r.reponse_a,reponse_b:r.reponse_b,reponse_c:r.reponse_c,reponse_d:r.reponse_d,bonne_reponse:String(r.bonne_reponse||'A').toUpperCase(),explication:r.explication||'',difficulte:Number(r.difficulte||1),actif:String(r.actif||'true').toLowerCase()!=='false'}));await api('POST',{questions:rows});setMessage(rows.length+' questions importées.');await refresh();}catch(e){setMessage(e.message);}}});}if(!connected){return <main className='container'><div className='card'><h1>Administration</h1><p className='muted'>Entre le mot de passe administrateur défini dans Vercel.</p><div className='form'><input type='password' value={password} onChange={e=>setPassword(e.target.value)} placeholder='Mot de passe admin'/><button className='primary' onClick={login}>Se connecter</button></div>{message&&<p className='notice'>{message}</p>}</div></main>;}return <main className='container'><div className='nav'><a href='/'>Retour au QCM</a></div><section className='card'><h1>Administration des questions</h1><p className='muted'>Ajout, modification, suppression et import CSV.</p>{message&&<p className='notice'>{message}</p>}<h2>{form.id?'Modifier une question':'Ajouter une question'}</h2><div className='form'><textarea placeholder='Question' value={form.question} onChange={e=>setForm({...form,question:e.target.value})}/><input placeholder='Réponse A' value={form.reponse_a} onChange={e=>setForm({...form,reponse_a:e.target.value})}/><input placeholder='Réponse B' value={form.reponse_b} onChange={e=>setForm({...form,reponse_b:e.target.value})}/><input placeholder='Réponse C' value={form.reponse_c} onChange={e=>setForm({...form,reponse_c:e.target.value})}/><input placeholder='Réponse D' value={form.reponse_d} onChange={e=>setForm({...form,reponse_d:e.target.value})}/><select value={form.bonne_reponse} onChange={e=>setForm({...form,bonne_reponse:e.target.value})}><option>A</option><option>B</option><option>C</option><option>D</option></select><textarea placeholder='Explication' value={form.explication} onChange={e=>setForm({...form,explication:e.target.value})}/><select value={form.difficulte} onChange={e=>setForm({...form,difficulte:Number(e.target.value)})}><option value='1'>Difficulté 1 — socle</option><option value='2'>Difficulté 2 — confirmé</option><option value='3'>Difficulté 3 — exigeant</option></select><button className='primary' onClick={saveQuestion}>{form.id?'Enregistrer la modification':'Ajouter'}</button>{form.id&&<button className='secondary' onClick={()=>setForm(empty)}>Annuler</button>}</div><h2>Import CSV</h2><input type='file' accept='.csv' onChange={e=>e.target.files?.[0]&&handleCsv(e.target.files[0])}/><h2>Questions existantes : {questions.length}</h2><table className='table'><thead><tr><th>ID</th><th>Question</th><th>Bonne réponse</th><th>Difficulté</th><th>Actions</th></tr></thead><tbody>{questions.map(q=><tr key={q.id}><td>{q.id}</td><td>{q.question}</td><td>{q.bonne_reponse}</td><td>{q.difficulte}</td><td><button className='secondary' onClick={()=>setForm(q)}>Modifier</button> <button className='danger' onClick={()=>deleteQuestion(q.id)}>Supprimer</button></td></tr>)}</tbody></table></section></main>}
+
+import { useState } from 'react';
+import Papa from 'papaparse';
+
+const empty = {
+  question: '',
+  reponse_a: '',
+  reponse_b: '',
+  reponse_c: '',
+  reponse_d: '',
+  bonne_reponse: 'A',
+  explication: '',
+  theme: '',
+  source: '',
+  difficulte: 1,
+  actif: true
+};
+
+export default function Admin() {
+  const [password, setPassword] = useState('');
+  const [connected, setConnected] = useState(false);
+  const [questions, setQuestions] = useState([]);
+  const [form, setForm] = useState(empty);
+  const [message, setMessage] = useState('');
+
+  async function api(method, body) {
+    const res = await fetch('/api/admin/questions', {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-password': password
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Erreur');
+    return json;
+  }
+
+  async function login() {
+    try {
+      const json = await api('GET');
+      setQuestions(json.questions || []);
+      setConnected(true);
+      setMessage('');
+    } catch (e) {
+      setMessage('Mot de passe incorrect ou configuration incomplète.');
+    }
+  }
+
+  async function refresh() {
+    const json = await api('GET');
+    setQuestions(json.questions || []);
+  }
+
+  async function saveQuestion() {
+    try {
+      if (form.id) {
+        await api('PUT', form);
+        setMessage('Question modifiée.');
+      } else {
+        await api('POST', form);
+        setMessage('Question ajoutée.');
+      }
+
+      setForm(empty);
+      await refresh();
+    } catch (e) {
+      setMessage(e.message);
+    }
+  }
+
+  async function deleteQuestion(id) {
+    if (!confirm('Supprimer cette question ?')) return;
+
+    try {
+      await api('DELETE', { id });
+      setMessage('Question supprimée.');
+      await refresh();
+    } catch (e) {
+      setMessage(e.message);
+    }
+  }
+
+  function handleCsv(file) {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const rows = results.data.map(r => ({
+            question: r.question,
+            reponse_a: r.reponse_a,
+            reponse_b: r.reponse_b,
+            reponse_c: r.reponse_c,
+            reponse_d: r.reponse_d,
+            bonne_reponse: String(r.bonne_reponse || 'A').toUpperCase(),
+            explication: r.explication || '',
+            theme: r.theme || '',
+            source: r.source || '',
+            difficulte: Number(r.difficulte || 1),
+            actif: String(r.actif || 'true').toLowerCase() !== 'false'
+          }));
+
+          await api('POST', { questions: rows });
+          setMessage(rows.length + ' questions importées.');
+          await refresh();
+        } catch (e) {
+          setMessage(e.message);
+        }
+      }
+    });
+  }
+
+  if (!connected) {
+    return (
+      <main className="container">
+        <div className="card">
+          <h1>Administration</h1>
+          <p className="muted">Entre le mot de passe administrateur défini dans Vercel.</p>
+
+          <div className="form">
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Mot de passe admin"
+            />
+            <button className="primary" onClick={login}>Se connecter</button>
+          </div>
+
+          {message && <p className="notice">{message}</p>}
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="container">
+      <div className="nav">
+        <a href="/">Retour au QCM</a>
+      </div>
+
+      <section className="card">
+        <h1>Administration des questions</h1>
+        <p className="muted">Ajout, modification, suppression et import CSV.</p>
+
+        {message && <p className="notice">{message}</p>}
+
+        <h2>{form.id ? 'Modifier une question' : 'Ajouter une question'}</h2>
+
+        <div className="form">
+          <textarea
+            placeholder="Question"
+            value={form.question}
+            onChange={e => setForm({ ...form, question: e.target.value })}
+          />
+
+          <input
+            placeholder="Réponse A"
+            value={form.reponse_a}
+            onChange={e => setForm({ ...form, reponse_a: e.target.value })}
+          />
+
+          <input
+            placeholder="Réponse B"
+            value={form.reponse_b}
+            onChange={e => setForm({ ...form, reponse_b: e.target.value })}
+          />
+
+          <input
+            placeholder="Réponse C"
+            value={form.reponse_c}
+            onChange={e => setForm({ ...form, reponse_c: e.target.value })}
+          />
+
+          <input
+            placeholder="Réponse D"
+            value={form.reponse_d}
+            onChange={e => setForm({ ...form, reponse_d: e.target.value })}
+          />
+
+          <select
+            value={form.bonne_reponse}
+            onChange={e => setForm({ ...form, bonne_reponse: e.target.value })}
+          >
+            <option>A</option>
+            <option>B</option>
+            <option>C</option>
+            <option>D</option>
+          </select>
+
+          <textarea
+            placeholder="Explication"
+            value={form.explication}
+            onChange={e => setForm({ ...form, explication: e.target.value })}
+          />
+
+          <input
+            placeholder="Thème"
+            value={form.theme || ''}
+            onChange={e => setForm({ ...form, theme: e.target.value })}
+          />
+
+          <input
+            placeholder="Source"
+            value={form.source || ''}
+            onChange={e => setForm({ ...form, source: e.target.value })}
+          />
+
+          <select
+            value={form.difficulte}
+            onChange={e => setForm({ ...form, difficulte: Number(e.target.value) })}
+          >
+            <option value="1">Difficulté 1 — socle</option>
+            <option value="2">Difficulté 2 — confirmé</option>
+            <option value="3">Difficulté 3 — BM4</option>
+            <option value="4">Difficulté 4 — EMIA / ODS</option>
+            <option value="5">Difficulté 5 — expert</option>
+          </select>
+
+          <button className="primary" onClick={saveQuestion}>
+            {form.id ? 'Enregistrer la modification' : 'Ajouter'}
+          </button>
+
+          {form.id && (
+            <button className="secondary" onClick={() => setForm(empty)}>
+              Annuler
+            </button>
+          )}
+        </div>
+
+        <h2>Import CSV</h2>
+
+        <input
+          type="file"
+          accept=".csv"
+          onChange={e => e.target.files?.[0] && handleCsv(e.target.files[0])}
+        />
+
+        <h2>Questions existantes : {questions.length}</h2>
+
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Question</th>
+              <th>Bonne réponse</th>
+              <th>Difficulté</th>
+              <th>Thème</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {questions.map(q => (
+              <tr key={q.id}>
+                <td>{q.id}</td>
+                <td>{q.question}</td>
+                <td>{q.bonne_reponse}</td>
+                <td>{q.difficulte}</td>
+                <td>{q.theme || ''}</td>
+                <td>
+                  <button className="secondary" onClick={() => setForm(q)}>
+                    Modifier
+                  </button>{' '}
+                  <button className="danger" onClick={() => deleteQuestion(q.id)}>
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  );
+}
